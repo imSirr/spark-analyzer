@@ -68,4 +68,4 @@ encodes them with [Protocol Buffers](https://protobuf.dev/). This app:
 
 ## License
 
-MIT, see `LICENSE`. This covers the analyzer's own code only, not the third party logos or icons.
+PolyForm Noncommercial License 1.0.0
