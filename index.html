@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spark Analyzer | Find what is lagging your Minecraft server</title>
+<meta name="description" content="Paste a spark.lucko.me link and find out exactly what is lagging your Minecraft server, and how to fix it: flame graph, entity hotspots, plugin and mod analysis, and plain-English recommendations.">
+<meta name="theme-color" content="#ffc93a">
+<meta property="og:title" content="Spark Analyzer">
+<meta property="og:description" content="Paste a spark.lucko.me link and get instant, actionable performance recommendations for your Minecraft server.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%E2%9A%A1</text></svg>">
+<link rel="stylesheet" href="assets/style.css">
+<!-- Decoding libs (CDN). protobuf.js full build includes the .proto parser. -->
+<script src="https://cdn.jsdelivr.net/npm/protobufjs@7.4.0/dist/protobuf.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js" defer></script>
+<script src="assets/schema.js" defer></script>
+<script src="assets/knowledge.js" defer></script>
+<script src="assets/rules.js" defer></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span><span><span class="spark">spark</span> analyzer</span></div>
+    <div class="links">
+      <a href="https://spark.lucko.me/docs" target="_blank" rel="noopener">spark docs</a>
+      <a href="https://spark.lucko.me/download" target="_blank" rel="noopener">get spark</a>
+    </div>
+  </div>
+
+  <!-- LANDING -->
+  <div id="landing">
+    <div class="hero">
+      <h1>Analyze your <span class="spark">spark</span> report</h1>
+      <p>Paste a <code>spark.lucko.me</code> link and get straight answers: <strong>what is eating your server's ticks</strong>, which chunks, plugins or mods are behind it, and exactly what to change (or which optimization mod to add) for your kind of server.</p>
+
+      <div class="loadbox">
+        <form id="load-form" autocomplete="off">
+          <input id="url-input" class="input" type="text" placeholder="https://spark.lucko.me/xxxxxxxxxx  or  just the code" spellcheck="false">
+          <button class="btn" type="submit">Analyze</button>
+        </form>
+        <div class="hint">Tip: generate one in-game with <code>/spark profiler</code>, <code>/spark heapsummary</code> or <code>/spark health</code>.</div>
+      </div>
+
+      <div id="status" class="status"></div>
+      <div id="loader"><div class="spinner"></div><span id="loader-msg">Loading…</span></div>
+
+      <div class="dropzone" id="dropzone">
+        <div>⬆️ <strong>Drop a profile/heap file here</strong> or click to choose</div>
+        <div style="font-size:12.5px;margin-top:4px">Everything runs right here in your browser, so your data (and your secret base coords) never leave your computer.</div>
+        <input id="file-input" type="file" accept=".sparkprofile,.sparkheap" hidden>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature"><div class="ic">🔥</div><h3>Finds what's eating your ticks</h3><p>Reads the profiler and breaks your tick time down by area: entities, chunks, redstone, hoppers, lighting and more.</p></div>
+      <div class="feature"><div class="ic">🧩</div><h3>Platform-aware mod picks</h3><p>Detects Paper / Fabric / Forge / NeoForge and recommends the right optimization mod for the exact problem (Lithium, Canary, Moonrise, C2ME, FerriteCore…).</p></div>
+      <div class="feature"><div class="ic">🐄</div><h3>Entity hotspots</h3><p>Lists the worst chunks by entity count, <em>with coordinates</em>, so you can jump right to the lag. Packed chunks are the number one cause.</p></div>
+      <div class="feature"><div class="ic">🔎</div><h3>Source attribution</h3><p>Ranks plugins/mods by their share of server-thread time, so a single heavy add-on can't hide.</p></div>
+      <div class="feature"><div class="ic">🩺</div><h3>Health dashboard</h3><p>TPS, MSPT, CPU, memory, GC and world stats with red / yellow / green status at a glance.</p></div>
+      <div class="feature"><div class="ic">📊</div><h3>Flame graph, heap & timeline</h3><p>Interactive flame graph + call tree, heap class histogram, and per-minute TPS/MSPT/CPU history.</p></div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="result" style="display:none"></div>
+
+  <div class="footer">
+    Built for the spark format by <a href="https://spark.lucko.me/" target="_blank" rel="noopener">lucko/spark</a>.
+    Recommendations adapted from the community (birdflop/botflop and Paper optimization guides).
+    Not affiliated with spark or PaperMC. All parsing happens in your browser.
+  </div>
+
+</div>
+</body>
+</html>
