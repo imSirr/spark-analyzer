@@ -55,6 +55,8 @@ const SparkRules = (() => {
       installedNorm: new Set(plugins.map(pl => SparkKB.norm(pl.name))),
       isServerReport: (pm.type === 'SERVER' || pm.type == null),
       reportKind: (pm.type === 'CLIENT' ? 'client' : pm.type === 'PROXY' ? 'proxy' : 'server'),
+      mcMinor: parseInt((pm.minecraftVersion || '').split('.')[1]) || 0,
+      flagAdvice: (() => { const mm = parseInt((pm.minecraftVersion || '').split('.')[1]) || 0; return mm > 0 && mm < 13; })(),
       samplerMode: md.samplerMode || 'EXECUTION',
       isAllocation: md.samplerMode === 'ALLOCATION',
       profile: { ticks: num(md.numberOfTicks), interval: num(md.interval), engine: md.samplerEngine || '',
@@ -252,7 +254,8 @@ const SparkRules = (() => {
       if (memBound) {
         issues.push(mk('critical', 'Diagnosis', '🧭 Main limit: RAM (memory)',
           `The server is lagging and memory is under pressure${heapRatio != null ? ` (heap ${(heapRatio * 100).toFixed(0)}%` : ''}${longGc ? `, ${oldGc.name} pauses about ${oldGc.avgTime.toFixed(0)}ms` : ''}${heapRatio != null ? ')' : ''}. In this case, adding RAM (and memory mods) really does help.`,
-          'Raise the heap toward the recommended range below, use Aikar’s flags, and if you are modded, add the memory mods listed.',
+          ctx.flagAdvice ? 'Raise the heap toward the recommended range below, use Aikar’s flags, and if you are modded, add the memory mods listed.'
+                         : 'Raise the heap toward the recommended range below, and if you are modded, add the memory mods listed.',
           ctx.platform.isModded ? SparkKB.MODS.filter(m => (m.scenarios || []).includes('memory') && m.platforms.includes(ctx.platform.loader)).slice(0, 2).map(m => ({ name: m.name, url: m.url, blurb: m.blurb })) : [], '', 99));
       } else {
         issues.push(mk('critical', 'Diagnosis', '🧭 Main limit: CPU, not RAM',
@@ -270,7 +273,8 @@ const SparkRules = (() => {
       const mm = ctx.platform.isModded ? SparkKB.MODS.filter(m => (m.scenarios || []).includes('memory') && m.platforms.includes(ctx.platform.loader)).slice(0, 2).map(m => ({ name: m.name, url: m.url, blurb: m.blurb })) : [];
       issues.push(mk('warning', 'Memory', '🧠 Memory pressure',
         `Signs of memory pressure (${bits.join(', ')}). That leads to GC pauses, which show up as stutter.`,
-        ctx.platform.isModded ? 'Give the server a little more RAM, use good GC flags, and add the memory mods below.' : 'Give the server a little more RAM and use Aikar\'s flags.', mm, '', 0.34));
+        ctx.platform.isModded ? (ctx.flagAdvice ? 'Give the server a little more RAM, use good GC flags, and add the memory mods below.' : 'Give the server a little more RAM and add the memory mods below.')
+                              : (ctx.flagAdvice ? 'Give the server a little more RAM and use Aikar\'s flags.' : 'Give the server a little more RAM.'), mm, '', 0.34));
     }
 
     // ---- RAM right-sizing + over-allocation ----
@@ -283,12 +287,14 @@ const SparkRules = (() => {
       if (xmxGb < band.min - 0.5) {
         issues.push(mk('warning', 'Memory', '💾 Likely under-allocated RAM',
           `Right now about ${xmxGb.toFixed(1)} GB is set aside for the server. A ${ctx.platform.label} server with ${band.count} ${addonWord} and around ${ctx.players} players usually wants about **${band.min}-${band.max} GB**.`,
-          `Raise \`-Xmx\` to around ${band.min}-${band.max} GB, and set \`-Xms\` to the same value.`,
+          ctx.flagAdvice ? `Raise \`-Xmx\` to around ${band.min}-${band.max} GB, and set \`-Xms\` to the same value.`
+                         : `Give the server about ${band.min}-${band.max} GB of RAM. On most hosts that is a plan or panel setting.`,
           ctx.platform.isModded ? SparkKB.MODS.filter(m => (m.scenarios || []).includes('memory') && m.platforms.includes(ctx.platform.loader)).slice(0, 2).map(m => ({ name: m.name, url: m.url, blurb: m.blurb })) : [], '', 0.35));
       } else if (physGb && xmxGb > physGb * 0.85) {
         issues.push(mk('warning', 'Memory', '💾 Too much RAM allocated to the heap',
           `About ${xmxGb.toFixed(1)} GB of the machine’s ${physGb.toFixed(0)} GB is handed to the server, which leaves very little for the operating system. Giving Java too much can also make its cleanup pauses longer. A good target is about 60-70% of the machine’s RAM.`,
-          'Leave 2-4 GB free for the operating system, and lower `-Xmx` if the server never actually uses it all.', [], '', 0.2));
+          ctx.flagAdvice ? 'Leave 2-4 GB free for the operating system, and lower `-Xmx` if the server never actually uses it all.'
+                         : 'Leave 2-4 GB free for the operating system, and lower the server\'s allocated RAM if it never actually uses it all.', [], '', 0.2));
       }
     }
 
@@ -311,7 +317,7 @@ const SparkRules = (() => {
         `Switch the server’s Java version to ${recJ}. (This means the Java runtime, not your Minecraft version.)`, [], '', 0.1));
 
     // ---- large-heap ZGC option ----
-    if (ctx.flags && ctx.xmx != null && ctx.xmx >= 12288 && !/UseZGC|UseShenandoah/.test(ctx.flags))
+    if (ctx.flagAdvice && ctx.flags && ctx.xmx != null && ctx.xmx >= 12288 && !/UseZGC|UseShenandoah/.test(ctx.flags))
       issues.push(mk('info', 'JVM', '⚙️ Big heap: ZGC is an option',
         `With about ${(ctx.xmx / 1024).toFixed(0)} GB of heap, the ZGC garbage collector can smooth out GC stutter. It wants plenty of RAM and a decent CPU, so on an older or small machine stick with Aikar's G1 flags.`,
         'On Java 21 or newer you can try `-XX:+UseZGC -XX:+ZGenerational` instead of the G1 flags.', [], '', 0.05));
@@ -378,7 +384,7 @@ const SparkRules = (() => {
 
     // JVM flags — only the high-impact checks, concise
     const f = ctx.flags;
-    if (f) {
+    if (f && ctx.flagAdvice) {
       const aikar = f.includes('-Daikars.new.flags=true');
       const zgc = f.includes('-XX:+UseZGC') || f.includes('-XX:+UseShenandoahGC');
       if (!aikar && !zgc)
