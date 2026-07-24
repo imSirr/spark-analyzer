@@ -15,9 +15,20 @@ Pages (or any static host) exactly as is. Your report data never leaves your com
 
 ## What it does
 
-- **Bottleneck verdict.** Tells you whether you are **CPU/complexity bound or memory bound**, so you
-  do not waste money on RAM that will not help. It accounts for the fact that Minecraft runs the
-  world on a single thread, so overall CPU usage can look low even when one core is maxed out.
+- **Bottleneck verdict.** Tells you whether you are **CPU/complexity bound, memory bound, or
+  host-limited** (low TPS with a fast tick = an oversold node stealing your CPU, not your server),
+  so you do not waste money on RAM that will not help. It accounts for the fact that Minecraft runs
+  the world on a single thread, so overall CPU usage can look low even when one core is maxed out.
+- **Config-aware advice.** Recommendations check the server's *actual* captured config and installed
+  plugins first — it will not tell you to lower a view-distance that is already 6, or to install
+  Chunky when you already have it. Advice that changes gameplay says so.
+- **Profile-quality gate.** Warns when a report cannot support strong conclusions: too short, taken
+  at startup or with nobody online, slow-ticks-only (`--only-ticks-over`) captures, or the less
+  reliable Windows sampler — and reads each of those correctly.
+- **Report comparison.** Paste a before/after pair of links and get a delta table of TPS, MSPT,
+  entities and per-subsystem shares — profile, change one thing, profile again.
+- **"Copy for AI".** One click exports a full machine-readable digest of the report + findings for
+  pasting into an AI assistant or a help channel.
 - **Tick breakdown.** Reads the profiler and splits the server thread's time across subsystems
   (entity ticking, mob AI, spawning, block entities, hoppers, chunk loading, world generation,
   lighting, redstone, fluids, networking, datapack functions, and more), and shows busy non main
