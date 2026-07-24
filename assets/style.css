@@ -327,3 +327,11 @@ td.small{color:var(--muted)}
 .plat-badge.has-logo{background:transparent !important;padding:0;min-width:0;width:28px;height:28px;overflow:hidden;border-radius:7px}
 .plat-badge.has-logo .plat-logo{display:block;width:28px;height:28px;border-radius:7px;object-fit:cover;background:#0b0e14}
 .plat-badge.has-logo .plat-mono{display:none}
+
+/* ---------- compare mode ---------- */
+.compare-box{margin-top:14px;border:1px dashed var(--line,#3a455a);border-radius:10px;padding:10px 14px;color:var(--muted,#94a2b8)}
+.compare-box summary{cursor:pointer;font-weight:600}
+.compare-box form{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.compare-box .input{flex:1;min-width:220px}
+.cmp-good{color:var(--good,#4ade80);font-weight:600}
+.cmp-bad{color:var(--bad,#ef4444);font-weight:600}

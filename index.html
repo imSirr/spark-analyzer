@@ -52,6 +52,16 @@
         <div style="font-size:12.5px;margin-top:4px">Everything runs right here in your browser, so your data (and your secret base coords) never leave your computer.</div>
         <input id="file-input" type="file" accept=".sparkprofile,.sparkheap" hidden>
       </div>
+
+      <details class="compare-box" id="compare-box">
+        <summary>⚖️ Compare two reports (before / after)</summary>
+        <form id="compare-form" autocomplete="off">
+          <input id="compare-a" class="input" type="text" placeholder="Before: spark link or code" spellcheck="false">
+          <input id="compare-b" class="input" type="text" placeholder="After: spark link or code" spellcheck="false">
+          <button class="btn" type="submit">Compare</button>
+        </form>
+        <div class="hint">Great for checking whether a change actually helped: profile, change one thing, profile again.</div>
+      </details>
     </div>
 
     <div class="features">
