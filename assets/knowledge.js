@@ -19,7 +19,8 @@ const SparkKB = (() => {
     let loader = 'unknown', family = 'unknown', label = meta.brand || meta.platformName || 'Unknown';
     if (type === 'PROXY' || has('velocity') || has('bungeecord') || has('waterfall') || has('gate')) {
       loader = 'proxy'; family = 'proxy';
-    } else if (has('neoforge')) { loader = 'neoforge'; family = 'modded'; }
+    } else if (has('hytale')) { loader = 'hytale'; family = 'hytale'; } // spark ports exist for Hytale servers
+    else if (has('neoforge')) { loader = 'neoforge'; family = 'modded'; }
     else if (has('quilt')) { loader = 'quilt'; family = 'modded'; }
     else if (has('fabric')) { loader = 'fabric'; family = 'modded'; }
     // hybrids first (they contain "forge" AND a bukkit api)
@@ -42,7 +43,9 @@ const SparkKB = (() => {
    */
   const SUBSYSTEMS = [
     { id: 'idle', label: 'Idle / waiting (healthy)', icon: '😴', idle: true,
-      patterns: [/waitUntilNextTick/i, /sleepForTick/i, /\bThread\.sleep\b/i, /LockSupport\.park/i, /Unsafe\.park/i, /pollTask/i] },
+      patterns: [/waitUntilNextTick/i, /waitForTasks/i, /sleepForTick/i, /recordTaskExecutionTime/i, /\bThread\.sleep\b/i,
+        /LockSupport\.park/i, /Unsafe\.park/i, /parkNanos/i, /awaitNanos/i, /pollTask/i, /Object\.wait\b/i,
+        /pthread_cond/i, /epoll_?wait/i, /managedBlock/i] },
 
     { id: 'hoppers', label: 'Hoppers', icon: '📦',
       patterns: [/Hopper/i] },
@@ -112,37 +115,47 @@ const SparkKB = (() => {
    * platforms: which loaders the mod supports.
    * scenarios: subsystem ids this mod helps with.
    */
+  /* Mods may declare `available(loader, era)` — era is mcEra() (1.x -> x,
+   * 26.1+ -> 100+). Gates verified against Modrinth/CurseForge/GitHub, July 2026. */
   const MR = 'https://modrinth.com/mod/';
   const MODS = [
     { id: 'lithium', name: 'Lithium', url: MR + 'lithium', platforms: ['fabric', 'neoforge', 'quilt'],
       scenarios: ['entities', 'mobai', 'spawning', 'blockentities', 'blockticks', 'hoppers', 'chunks', 'fluids', 'villagers'],
-      blurb: 'Speeds up a huge range of game logic (mob AI, block ticking, hoppers, chunks). Often 30-50% faster, with no change to how the game plays.' },
+      available: (l, e) => l === 'neoforge' ? (!e || e >= 21.01) : true, // NeoForge builds exist since 0.14.0 / MC 1.21.1
+      blurb: 'Speeds up a huge range of game logic (mob AI, block ticking, hoppers, chunks) with no change to how the game plays. The single best server optimization mod.' },
     { id: 'canary', name: 'Canary', url: 'https://www.curseforge.com/minecraft/mc-mods/canary', platforms: ['forge'],
       scenarios: ['entities', 'mobai', 'spawning', 'blockentities', 'blockticks', 'hoppers', 'chunks', 'fluids', 'villagers'],
-      blurb: 'The Forge version of Lithium. Same game-logic speedups for Forge servers.' },
-    { id: 'radium', name: 'Radium', url: MR + 'radium', platforms: ['forge', 'neoforge'],
+      available: (l, e) => !e || (e >= 18.02 && e <= 20.01), // Forge 1.18.2-1.20.1, unmaintained since
+      blurb: 'A Lithium fork for older Forge (1.18.2-1.20.1). Radium is usually the more complete choice.' },
+    { id: 'radium', name: 'Radium', url: MR + 'radium', platforms: ['forge'],
       scenarios: ['entities', 'mobai', 'spawning', 'blockentities', 'blockticks', 'hoppers', 'chunks', 'fluids', 'villagers'],
-      blurb: 'A Lithium port for (Neo)Forge. Same game-logic speedups, no gameplay changes.' },
+      available: (l, e) => !e || e <= 20.01, // last release Sep 2024, Forge <=1.20.1; on NeoForge 1.21+ use Lithium itself
+      blurb: 'The Lithium port for Forge up to 1.20.1. Same game-logic speedups, no gameplay changes.' },
     { id: 'moonrise', name: 'Moonrise', url: MR + 'moonrise-opt', platforms: ['fabric', 'neoforge'],
       scenarios: ['chunks', 'worldgen', 'lighting', 'entities'], conflicts: ['c2me'],
-      blurb: "Spottedleaf's port of Paper's chunk and tick optimizations. Big wins for chunk loading, generation and lighting. It replaces C2ME, so don't run both." },
-    { id: 'c2me', name: 'C2ME', url: MR + 'c2me-fabric', platforms: ['fabric'],
-      scenarios: ['worldgen', 'chunks'], conflicts: ['moonrise'],
-      blurb: 'Spreads chunk loading and world generation across all your CPU cores. Up to about 70% faster terrain, great when people explore a lot.' },
+      available: (l, e) => !e || e >= 21,
+      blurb: "Spottedleaf's port of Paper's chunk-system and tick optimizations (still beta). Big wins for chunk loading, generation and lighting. It replaces C2ME, so don't run both." },
+    { id: 'c2me', name: 'C2ME', url: MR + 'c2me-fabric', platforms: ['fabric', 'neoforge'],
+      scenarios: ['worldgen'], conflicts: ['moonrise'],
+      available: (l, e) => l === 'neoforge' ? (!e || e >= 21.01) : true,
+      blurb: 'Parallelizes chunk generation across CPU cores. Helps most on strong multi-core machines during heavy exploration — but community results are mixed and it has caused stalls/leaks on some setups. Test carefully, and never combine with Moonrise.' },
     { id: 'noisium', name: 'Noisium', url: MR + 'noisium', platforms: ['fabric', 'quilt', 'neoforge'],
       scenarios: ['worldgen'],
-      blurb: 'Speeds up world generation by roughly 20-30%. Works well alongside chunk mods.' },
+      available: (l, e) => !e || e <= 21.06, // no releases past MC 1.21.6 as of mid-2026
+      blurb: 'Speeds up world generation by roughly 20-30%. Works well alongside chunk mods. (Not updated past 1.21.6.)' },
     { id: 'ferritecore', name: 'FerriteCore', url: MR + 'ferrite-core', platforms: ['fabric', 'forge', 'neoforge', 'quilt'],
       scenarios: ['memory'],
       blurb: 'Cuts RAM use by around 40-50% by removing duplicated block and model data. A must for big modpacks.' },
     { id: 'modernfix', name: 'ModernFix', url: MR + 'modernfix', platforms: ['fabric', 'forge', 'neoforge'],
       scenarios: ['memory', 'boot'],
       blurb: 'An all-in-one mod that lowers RAM use, speeds up startup, and fixes a lot of bugs and leaks. Standard in most modpacks.' },
-    { id: 'memoryleakfix', name: 'MemoryLeakFix', url: MR + 'memoryleakfix', platforms: ['fabric', 'forge', 'quilt'], maxVer: '1.20.4',
+    { id: 'memoryleakfix', name: 'MemoryLeakFix', url: MR + 'memoryleakfix', platforms: ['fabric', 'forge', 'quilt'],
       scenarios: ['memory'],
-      blurb: 'Patches several known memory leaks (server and client). Good for servers that slow down the longer they run. (1.20.4 and older.)' },
+      available: (l, e) => !e || e <= 20.04, // abandoned Mar 2023; AllTheLeaks is the successor
+      blurb: 'Patches several known memory leaks (server and client). Good for servers that slow down the longer they run. (1.20.4 and older; use AllTheLeaks on newer versions.)' },
     { id: 'servercore', name: 'ServerCore', url: MR + 'servercore', platforms: ['fabric', 'forge', 'neoforge'],
       scenarios: ['entities', 'spawning', 'chunks'],
+      available: (l, e) => l === 'neoforge' ? (!e || e <= 21.05) : true, // NeoForge builds stopped at 1.21.5
       blurb: 'Server-focused tuning: mob and breeding caps, entity limits, and dynamic view distance. Great when you have lots of players.' },
     { id: 'krypton', name: 'Krypton', url: MR + 'krypton', platforms: ['fabric'],
       scenarios: ['network'],
@@ -155,13 +168,13 @@ const SparkKB = (() => {
       blurb: 'Rewrites the redstone engine to be up to about 95% cheaper, while behaving exactly like vanilla. Great for big farms and contraptions.' },
     { id: 'aiimprovements', name: 'AI Improvements', url: MR + 'ai-improvements', platforms: ['forge', 'neoforge'],
       scenarios: ['mobai'],
-      blurb: 'Lowers the CPU cost of mob pathfinding. Handy for packs with lots of custom or dense mobs.' },
+      blurb: 'Lowers the CPU cost of mob pathfinding. Its effect is much smaller on modern versions, and it can subtly change mob behavior — a last resort, not a staple.' },
     { id: 'scalablelux', name: 'ScalableLux', url: MR + 'scalablelux', platforms: ['fabric', 'forge', 'neoforge'],
       scenarios: ['lighting'],
       blurb: 'A fork of Starlight. A multithreaded, much faster lighting engine.' },
     { id: 'vmp', name: 'VMP (Very Many Players)', url: MR + 'vmp-fabric', platforms: ['fabric'],
       scenarios: ['network', 'chunks'],
-      blurb: 'Optimizes player tracking and chunk sending for servers with lots of players online at once.' },
+      blurb: 'Optimizes player tracking and chunk sending for servers with lots of players online at once. Still beta — the author warns it may break things; test before relying on it.' },
     { id: 'mobtimizations', name: 'Mobtimizations', url: MR + 'mobtimizations', platforms: ['fabric', 'forge'],
       scenarios: ['entities', 'mobai'],
       blurb: 'Tweaks entity behavior to cut their cost. Behavior can differ from vanilla very slightly.' },
@@ -179,16 +192,22 @@ const SparkKB = (() => {
       blurb: 'Pre-generates your world so the server is not building terrain while players explore. Works as a plugin or a mod.' },
   ];
 
-  function modsFor(loader, scenarioId) {
-    return MODS.filter(m => m.platforms.includes(loader) && (!scenarioId || (m.scenarios || []).includes(scenarioId)));
+  function modsFor(loader, scenarioId, era) {
+    return MODS.filter(m => m.platforms.includes(loader)
+      && (!scenarioId || (m.scenarios || []).includes(scenarioId))
+      && (!m.available || m.available(loader, era || 0)));
   }
 
   /* server-software fork suggestions (bukkit family) */
-  function forkSuggestion(platform) {
-    const l = platform.loader;
+  function forkSuggestion(platform, brand) {
+    const l = platform.loader, b = (brand || '').toLowerCase();
     if (l === 'craftbukkit') return { sev: 'critical', text: 'CraftBukkit has none of the modern performance work. Switch to **Paper**, a drop-in replacement that gives a big TPS boost.', url: 'https://papermc.io/downloads/paper' };
     if (l === 'spigot') return { sev: 'warning', text: 'Spigot is well behind Paper on performance. **Paper** is a drop-in upgrade with a lot more optimizations.', url: 'https://papermc.io/downloads/paper' };
-    if (l === 'paper') return { sev: 'info', text: 'On Paper you can squeeze out more with **Purpur** or **Pufferfish**. They add DAB (Dynamic Activation of Brain), which cuts the cost of mob and villager AI.', url: 'https://purpurmc.org/' };
+    if (l === 'paper') {
+      if (b.includes('purpur') || b.includes('pufferfish') || b.includes('folia') || b.includes('leaf'))
+        return null; // already on a Paper-family fork; nothing useful to suggest
+      return { sev: 'info', text: 'You are already on Paper, which has the important performance work. Forks like **Pufferfish** (DAB, throttles far-away mob AI) or **Purpur** (per-mob config toggles) can squeeze out a bit more, but gains over a well-tuned Paper are modest.', url: 'https://pufferfish.host/downloads' };
+    }
     return null;
   }
 
@@ -241,6 +260,22 @@ const SparkKB = (() => {
     return { tier: 'unknown' };
   }
 
+  /* ---------------- Minecraft version parsing ----------------
+   * Minecraft switched to year-based version numbers in 2026: after 1.21.11
+   * came 26.1, 26.1.x, 26.2, ... ("year.drop.hotfix"). mcEra() maps BOTH
+   * schemes onto one ascending scale so version gates keep working:
+   *   "1.X.Y"  -> X + Y/100          (1.20.5 -> 20.05, 1.21.11 -> 21.11)
+   *   "YY.D.H" -> 100 + (YY-26)*10+D (26.1 -> 101, 26.2 -> 102, 27.1 -> 111)
+   * All year-based versions compare above all classic versions.
+   */
+  function mcEra(v) {
+    const p = String(v || '').trim().split('.').map(n => parseInt(n));
+    if (!p.length || isNaN(p[0])) return 0;
+    if (p[0] === 1) return (p[1] || 0) + (p[2] || 0) / 100;
+    if (p[0] >= 25) return 100 + (p[0] - 26) * 10 + (p[1] || 0);
+    return 0;
+  }
+
   /* ---------------- Java runtime recommendation ---------------- */
   function javaMajor(v) {
     const s = String(v || '').trim();
@@ -248,11 +283,12 @@ const SparkKB = (() => {
     m = s.match(/^(\d+)/); return m ? parseInt(m[1]) : null;          // 17.0.8 -> 17
   }
   function recommendedJava(mcVersion) {
-    const p = String(mcVersion || '').split('.').map(n => parseInt(n) || 0);
-    const major = p[1] || 0, patch = p[2] || 0;
-    if (major > 20 || (major === 20 && patch >= 5) || major >= 21) return 21;
-    if (major >= 18) return 17;
-    if (major >= 17) return 16;
+    const e = mcEra(mcVersion);
+    if (!e) return null;
+    if (e >= 100) return 25;    // 26.1+ requires Java 25
+    if (e >= 20.05) return 21;  // 1.20.5+ requires Java 21
+    if (e >= 18) return 17;
+    if (e >= 17) return 16;
     return 8;
   }
 
@@ -271,11 +307,13 @@ const SparkKB = (() => {
     aiimprovements: ['aiimprovements'], memoryleakfix: ['memoryleakfix'], chunky: ['chunky'],
   };
 
-  // the core server-side mods worth having, per loader
+  // the core server-side mods worth having, per loader.
+  // C2ME is deliberately NOT core: community results are mixed (it has caused
+  // stalls/leaks on some setups) — it stays a conditional worldgen suggestion.
   const CORE_MODS = {
-    fabric: ['lithium', 'ferritecore', 'modernfix', 'c2me'],
+    fabric: ['lithium', 'ferritecore', 'modernfix'],
     quilt: ['lithium', 'ferritecore', 'modernfix'],
-    neoforge: ['lithium', 'ferritecore', 'modernfix', 'c2me'],
+    neoforge: ['lithium', 'ferritecore', 'modernfix'],
     forge: ['radium', 'ferritecore', 'modernfix'],
   };
 
@@ -305,7 +343,7 @@ const SparkKB = (() => {
     clab: { sev: 'junk', reason: 'is low-quality and redundant with proper culling mods.' },
     superfastmath: { sev: 'junk', reason: 'can actually be slower than vanilla and overlaps with Lithium.' },
     // breaks parity / harmful
-    fasterrandom: { sev: 'harmful', reason: 'breaks vanilla parity by changing how randomness works.' },
+    fasterrandom: { sev: 'redundant', reason: 'changes how vanilla randomness works, which can subtly affect technical farms, and the project appears unmaintained (its CurseForge listing is archived). Fine to keep if you accept that; remove if you want vanilla behavior.' },
     methane: { sev: 'harmful', reason: 'disables light calculations and breaks vanilla parity, and conflicts with proper lighting mods.' },
     ksyxis: { sev: 'harmful', reason: 'removes spawn chunks, which can break farms and mechanics that rely on them.' },
     smoothchunksave: { sev: 'harmful', reason: 'stops saving the world once MSPT goes above 50, which risks losing data.' },
@@ -332,10 +370,8 @@ const SparkKB = (() => {
     canary: { sev: 'redundant', reason: 'overlaps with Radium on Forge/NeoForge.', alt: 'Radium', loaders: ['forge', 'neoforge'] },
   };
 
-  function mcMinorOf(v) { const p = String(v || '').split('.'); return parseInt(p[1]) || 0; }
-
   function modAudit(names, loader, mcVersion) {
-    const minor = mcMinorOf(mcVersion);
+    const minor = mcEra(mcVersion); // era scale: 1.x -> x, 26.1+ -> 100+ (see mcEra)
     const normSet = new Set(names.map(norm));
     const remove = [], redundant = [];
     names.forEach(n => {
@@ -349,9 +385,11 @@ const SparkKB = (() => {
     });
     let core = (CORE_MODS[loader] || []).slice();
     if (isModInstalled('moonrise', normSet)) core = core.filter(id => id !== 'c2me'); // Moonrise replaces C2ME
-    const missingCore = core.filter(id => !isModInstalled(id, normSet)).map(id => {
-      const m = modById(id); return { id, name: m.name, url: m.url, blurb: m.blurb };
-    });
+    const missingCore = core
+      .filter(id => { const m = modById(id); return m && (!m.available || m.available(loader, minor)); })
+      .filter(id => !isModInstalled(id, normSet)).map(id => {
+        const m = modById(id); return { id, name: m.name, url: m.url, blurb: m.blurb };
+      });
     return { remove, redundant, missingCore };
   }
 
@@ -419,8 +457,9 @@ const SparkKB = (() => {
     // discord rpc / social
     'craftpresence','simplediscordrichpresence','simple-rpc','discordrpc','customdiscordrpc','lotrdrp','minetogether',
     'galacticraft-rpc','simplerpc',
-    // item viewers / recipe (client)
-    'jei','justenoughitems','roughlyenoughitems','emi','justenoughcalculation','justenougheffects','justenoughprofessions',
+    // item viewers / recipe (client) — note: JEI/REI/EMI themselves are NOT here
+    // (they have optional server components for recipe transfer / cheat sync)
+    'justenoughcalculation','justenougheffects','justenoughprofessions',
     'justenoughbeacons','just-enough-harvestcraft','justenoughdrags','jeed','jehc','jei_hover_search','jei_trim_hider',
     'jeiintegration','jerintegration','neirecipehandlers','distraction_free_recipes','better-recipe-book','hiddenrecipebook',
     'tconjei','tconplanner','forestryworktabledisplay','enchantmentdescriptions','nekosenchantedbooks','enchantment-lore',
@@ -479,10 +518,11 @@ const SparkKB = (() => {
     forge:       { color: '#1f3b57', text: '#dbe7f3', mono: 'Fg', name: 'Forge' },
     neoforge:    { color: '#f16436', text: '#ffffff', mono: 'Ne', name: 'NeoForge' },
     hybrid:      { color: '#6b7280', text: '#ffffff', mono: 'Hy', name: 'Hybrid' },
+    hytale:      { color: '#f59e0b', text: '#231a06', mono: 'Ht', name: 'Hytale' },
     proxy:       { color: '#3b82f6', text: '#ffffff', mono: 'Px', name: 'Proxy' },
     unknown:     { color: '#3a455a', text: '#cbd5e1', mono: '?',  name: 'Unknown' },
   };
   function platformStyle(loader) { return PLATFORM_STYLE[loader] || PLATFORM_STYLE.unknown; }
 
-  return { classifyPlatform, classifyFrame, subsystemMeta, SUBSYSTEMS, originOfClass, MODS, modsFor, forkSuggestion, infoFor, cpuQuality, javaMajor, recommendedJava, norm, isModInstalled, modAudit, detectClientMods, guessSourceFromPackage, platformStyle };
+  return { classifyPlatform, classifyFrame, subsystemMeta, SUBSYSTEMS, originOfClass, MODS, modsFor, forkSuggestion, infoFor, cpuQuality, javaMajor, recommendedJava, mcEra, norm, isModInstalled, modAudit, detectClientMods, guessSourceFromPackage, platformStyle };
 })();
